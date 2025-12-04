@@ -2,6 +2,13 @@
 
 **Precision Psychiatry** é uma plataforma simples de teste de IA/ML que integra dados genéticos, neurobiológicos e psicossociais para:
 
+- **Predição de Resposta Terapêutica**: Prever resposta a medicamentos antidepressivos
+- **Análise Genômica**: Integração de dados de polimorfismos genéticos relevantes
+- **Marcadores Neurobiológicos**: Processamento de dados de neuroimagem, EEG, biomarcadores
+- **Fatores Psicossociais**: Avaliação de estressores ambientais e dados demográficos
+- **Recomendação de Medicamentos**: Sugestões personalizadas para pacientes com depressão refratária
+- **Monitoramento Longitudinal**: Acompanhamento de resposta ao tratamento ao longo do tempo
+
 ## Arquitetura do Projeto
 
 ```
