@@ -1,0 +1,333 @@
+"""
+Testes de integração do workflow completo.
+"""
+
+import pytest
+import pandas as pd
+import numpy as np
+from pathlib import Path
+import tempfile
+import json
+
+from src.config import get_config
+from src.data.loaders import load_data, save_data
+from src.data.validators import validate_data, ComprehensiveValidator
+from src.data.preprocessors import build_default_pipeline
+from src.features.genomic import extract_genomic_features
+from src.features.neurobiological import extract_neurobiological_features
+from src.features.psychosocial import extract_psychosocial_features
+from src.ml_pipeline.pipeline import run_full_pipeline
+from src.data.generators import generate_and_save_dataset
+
+
+class TestCompleteWorkflow:
+    """Testes de integração do workflow completo."""
+    
+    @pytest.fixture
+    def synthetic_dataset(self):
+        """Gerar dataset sintético para testes."""
+        config = get_config()
+        dataset, path = generate_and_save_dataset(
+            output_dir=Path("data/synthetic"),
+            n_patients=100
+        )
+        return dataset
+    
+    def test_data_loading(self, synthetic_dataset):
+        """Teste: Carregar dados."""
+        assert synthetic_dataset is not None
+        assert len(synthetic_dataset) == 100
+        assert synthetic_dataset.shape[1] > 50
+    
+    def test_data_validation(self, synthetic_dataset):
+        """Teste: Validar dados."""
+        validation_result = validate_data(synthetic_dataset)
+        
+        assert validation_result is not None
+        assert isinstance(validation_result.is_valid, bool)
+    
+    def test_data_preprocessing(self, synthetic_dataset):
+        """Teste: Pré-processar dados."""
+        # Selecionar apenas features numéricas
+        numeric_cols = synthetic_dataset.select_dtypes(include=[np.number]).columns
+        X = synthetic_dataset[numeric_cols].iloc[:50]
+        
+        pipeline = build_default_pipeline()
+        X_processed = pipeline.fit_transform(X)
+        
+        assert X_processed is not None
+        assert X_processed.shape[0] > 0
+    
+    def test_feature_extraction(self, synthetic_dataset):
+        """Teste: Extrair features."""
+        # Features genômicas
+        genomic_features = extract_genomic_features(synthetic_dataset)
+        assert genomic_features is not None
+        assert len(genomic_features) == len(synthetic_dataset)
+        
+        # Features neurobiológicas
+        neuro_features = extract_neurobiological_features(synthetic_dataset)
+        assert neuro_features is not None
+        
+        # Features psicossociais
+        psycho_features = extract_psychosocial_features(synthetic_dataset)
+        assert psycho_features is not None
+    
+    def test_model_training(self, synthetic_dataset):
+        """Teste: Treinar modelo completo."""
+        # Preparar dados
+        y = synthetic_dataset["responder"].astype(int)
+        drop_cols = ["responder", "response_status", "refractory", 
+                    "response_probability", "patient_id", "created_at",
+                    "cohort", "phq9_baseline", "phq9_week12"]
+        X = synthetic_dataset.drop(
+            columns=[col for col in drop_cols if col in synthetic_dataset.columns]
+        )
+        
+        # Treinar pipeline
+        pipeline, metrics = run_full_pipeline(
+            X.iloc[:50],
+            y.iloc[:50],
+            test_size=0.2,
+            model_type="xgboost"
+        )
+        
+        assert pipeline is not None
+        assert metrics is not None
+        assert "auc_roc" in metrics
+        assert metrics["auc_roc"] > 0.5
+    
+    def test_data_persistence(self, synthetic_dataset):
+        """Teste: Salvar e carregar dados."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmppath = Path(tmpdir)
+            
+            # Salvar em múltiplos formatos
+            csv_path = tmppath / "data.csv"
+            parquet_path = tmppath / "data.parquet"
+            
+            save_data(synthetic_dataset, csv_path, format="csv")
+            save_data(synthetic_dataset, parquet_path, format="parquet")
+            
+            # Carregar
+            df_csv = load_data(csv_path)
+            df_parquet = load_data(parquet_path)
+            
+            assert len(df_csv) == len(synthetic_dataset)
+            assert len(df_parquet) == len(synthetic_dataset)
+    
+    def test_patient_validation(self):
+        """Teste: Validar dados de paciente individual."""
+        patient_data = {
+            "patient_id": "PAT_TEST_001",
+            "genomic_data": {
+                "metabolizer_status": "extensive",
+                "cyp2d6_genotype": 2,
+                "cyp3a4_genotype": 1,
+                "mthfr_genotype": 0,
+                "bdnf_genotype": 1
+            },
+            "neurobiological_data": {
+                "il6_pg_ml": 2.5,
+                "tnf_alpha_pg_ml": 3.2,
+                "cortisol_morning_nmol_l": 320,
+                "cortisol_evening_nmol_l": 150,
+                "serotonin_ng_ml": 55.0,
+                "dopamine_pg_ml": 28.0,
+                "bdnf_ng_ml": 75.0,
+                "crp_mg_l": 2.1
+            },
+            "psychosocial_data": {
+                "age": 45,
+                "gender": "F",
+                "bmi": 24.5,
+                "education_years": 16,
+                "phq9_score": 18,
+                "gad7_score": 14,
+                "ctq_total": 45,
+                "ace_total": 2,
+                "social_support_score": 28,
+                "employment_status": "employed"
+            }
+        }
+        
+        validator = ComprehensiveValidator(strict=False)
+        result = validator.validate_patient_complete(patient_data)
+        
+        assert result.is_valid or len(result.errors) == 0
+    
+    def test_end_to_end_prediction(self):
+        """Teste: Predição end-to-end."""
+        from scripts.inference import InferenceEngine
+        
+        # Gerar dataset e treinar modelo
+        dataset, _ = generate_and_save_dataset(n_patients=100)
+        
+        y = dataset["responder"].astype(int)
+        drop_cols = ["responder", "response_status", "refractory",
+                    "response_probability", "patient_id", "created_at",
+                    "cohort", "phq9_baseline", "phq9_week12"]
+        X = dataset.drop(columns=[col for col in drop_cols if col in dataset.columns])
+        
+        pipeline, _ = run_full_pipeline(X, y, test_size=0.2)
+        
+        # Salvar modelo
+        with tempfile.TemporaryDirectory() as tmpdir:
+            model_path = Path(tmpdir) / "model"
+            pipeline.save(model_path)
+            
+            # Carregar engine
+            engine = InferenceEngine(model_path)
+            
+            # Fazer predição
+            patient_data = {
+                "patient_id": "PAT_PRED_001",
+                "genomic_data": {
+                    "metabolizer_status": "extensive",
+                    "cyp2d6_genotype": 2,
+                    "cyp3a4_genotype": 1,
+                    "mthfr_genotype": 0,
+                    "bdnf_genotype": 1
+                },
+                "neurobiological_data": {
+                    "il6_pg_ml": 2.5,
+                    "tnf_alpha_pg_ml": 3.2,
+                    "cortisol_morning_nmol_l": 320,
+                    "cortisol_evening_nmol_l": 150,
+                    "serotonin_ng_ml": 55.0,
+                    "dopamine_pg_ml": 28.0,
+                    "bdnf_ng_ml": 75.0,
+                    "crp_mg_l": 2.1
+                },
+                "psychosocial_data": {
+                    "age": 45,
+                    "gender": "F",
+                    "bmi": 24.5,
+                    "education_years": 16,
+                    "phq9_score": 18,
+                    "gad7_score": 14,
+                    "ctq_total": 45,
+                    "ace_total": 2,
+                    "social_support_score": 28,
+                    "employment_status": "employed"
+                }
+            }
+            
+            result = engine.predict_patient(patient_data)
+            
+            assert result is not None
+            assert "prediction" in result
+            assert 0 <= result["prediction"] <= 1
+
+
+class TestDataQuality:
+    """Testes de qualidade de dados."""
+    
+    def test_missing_values_handling(self):
+        """Teste: Tratamento de valores faltantes."""
+        from src.data.preprocessors import MissingValueHandler
+        
+        df = pd.DataFrame({
+            "col1": [1, 2, np.nan, 4, 5],
+            "col2": [np.nan, np.nan, np.nan, np.nan, np.nan],
+            "col3": [1, 2, 3, 4, 5]
+        })
+        
+        handler = MissingValueHandler(strategy="mean", threshold=0.8)
+        df_processed = handler.fit_transform(df)
+        
+        assert df_processed is not None
+        assert df_processed.isnull().sum().sum() == 0
+    
+    def test_outlier_detection(self):
+        """Teste: Detecção de outliers."""
+        from src.data.preprocessors import OutlierRemover
+        
+        df = pd.DataFrame({
+            "col1": [1, 2, 3, 4, 5, 100],  # 100 é outlier
+            "col2": [10, 20, 30, 40, 50, 60]
+        })
+        
+        remover = OutlierRemover(method="iqr", threshold=3.0)
+        df_clean = remover.fit_transform(df)
+        
+        assert len(df_clean) < len(df)
+        assert 100 not in df_clean["col1"].values
+    
+    def test_normalization(self):
+        """Teste: Normalização de features."""
+        from src.data.preprocessors import NormalizeScaler
+        
+        df = pd.DataFrame({
+            "col1": [1, 2, 3, 4, 5],
+            "col2": [10, 20, 30, 40, 50]
+        })
+        
+        scaler = NormalizeScaler(method="standard")
+        result = scaler.fit_transform(df)
+        
+        assert result is not None
+        assert isinstance(result, np.ndarray)
+        assert np.abs(np.mean(result[:, 0])) < 0.1  # Média ~0
+
+
+class TestFeatureEngineering:
+    """Testes de engenharia de features."""
+    
+    def test_genomic_feature_extraction(self):
+        """Teste: Extração de features genômicas."""
+        from src.features.genomic import GenomicInterpreter
+        
+        genotypes = {
+            "CYP2D6_genotype": 2,
+            "BDNF_genotype": 1
+        }
+        
+        # Teste de recomendação de medicamentos
+        recs = GenomicInterpreter.get_medication_recommendations(
+            genotypes,
+            "extensive"
+        )
+        
+        assert recs is not None
+        assert "recommended" in recs
+        assert len(recs["recommended"]) > 0
+    
+    def test_neurobiological_feature_extraction(self):
+        """Teste: Extração de features neurobiológicas."""
+        from src.features.neurobiological import BiomarkerInterpreter
+        
+        biomarkers = {
+            "il6_pg_ml": 2.5,
+            "cortisol_morning_nmol_l": 320,
+            "serotonin_ng_ml": 55.0,
+            "bdnf_ng_ml": 75.0
+        }
+        
+        interpretations = BiomarkerInterpreter.interpret_biomarker_profile(biomarkers)
+        
+        assert interpretations is not None
+        assert "inflammation" in interpretations
+        assert "hpa_axis" in interpretations
+    
+    def test_psychosocial_risk_assessment(self):
+        """Teste: Avaliação de risco psicossocial."""
+        from src.features.psychosocial import ClinicalSeverityAssessor
+        
+        data = {
+            "phq9_score": 20,
+            "gad7_score": 15,
+            "ctq_total": 100,
+            "ace_total": 4,
+            "psqi_score": 10
+        }
+        
+        risk_level = ClinicalSeverityAssessor.get_risk_level(data)
+        severity = ClinicalSeverityAssessor.get_overall_severity(data)
+        
+        assert risk_level in ["low", "moderate", "high"]
+        assert severity in ["minimal", "mild", "moderate", "moderately_severe", "severe"]
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

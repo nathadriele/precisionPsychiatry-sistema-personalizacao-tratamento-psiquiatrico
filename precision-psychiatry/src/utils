@@ -1,0 +1,355 @@
+"""
+logger.py - Logging estruturado
+"""
+
+import logging
+import json
+from datetime import datetime
+from pathlib import Path
+from typing import Optional, Dict, Any
+
+
+class StructuredLogger:
+    """Logger estruturado para eventos da aplicação."""
+    
+    def __init__(
+        self,
+        name: str,
+        log_file: Optional[Path] = None,
+        level: str = "INFO"
+    ):
+        self.logger = logging.getLogger(name)
+        self.logger.setLevel(getattr(logging, level))
+        
+        # Console handler
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(getattr(logging, level))
+        console_formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+        console_handler.setFormatter(console_formatter)
+        self.logger.addHandler(console_handler)
+        
+        # File handler se especificado
+        if log_file:
+            log_file.parent.mkdir(parents=True, exist_ok=True)
+            file_handler = logging.FileHandler(log_file)
+            file_handler.setLevel(getattr(logging, level))
+            file_formatter = logging.Formatter(
+                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            )
+            file_handler.setFormatter(file_formatter)
+            self.logger.addHandler(file_handler)
+    
+    def log_event(
+        self,
+        event_type: str,
+        message: str,
+        level: str = "INFO",
+        **kwargs
+    ):
+        """Registrar evento estruturado."""
+        event = {
+            "timestamp": datetime.now().isoformat(),
+            "event_type": event_type,
+            "message": message,
+            **kwargs
+        }
+        
+        log_method = getattr(self.logger, level.lower())
+        log_method(json.dumps(event))
+    
+    def log_metric(self, metric_name: str, value: float, **kwargs):
+        """Registrar métrica."""
+        self.log_event(
+            "metric",
+            f"Metric: {metric_name}={value}",
+            metric_name=metric_name,
+            value=value,
+            **kwargs
+        )
+    
+    def log_error(self, message: str, exception: Exception = None, **kwargs):
+        """Registrar erro."""
+        self.log_event(
+            "error",
+            message,
+            level="ERROR",
+            exception=str(exception) if exception else None,
+            **kwargs
+        )
+
+
+# ---
+
+"""
+decorators.py - Decoradores úteis
+"""
+
+import time
+import functools
+from typing import Callable, Any
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def timer(func: Callable) -> Callable:
+    """Decorador para medir tempo de execução."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        result = func(*args, **kwargs)
+        duration = time.time() - start
+        logger.info(f"{func.__name__} levou {duration:.2f}s")
+        return result
+    return wrapper
+
+
+def log_calls(func: Callable) -> Callable:
+    """Decorador para registrar chamadas de função."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        logger.info(f"Chamando {func.__name__}")
+        result = func(*args, **kwargs)
+        logger.info(f"{func.__name__} concluído")
+        return result
+    return wrapper
+
+
+def validate_input(schema: Dict) -> Callable:
+    """Decorador para validar input."""
+    def decorator(func: Callable) -> Callable:
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            # Implementar validação baseada em schema
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+def cache_result(ttl: int = 3600) -> Callable:
+    """Decorador para cachear resultado."""
+    def decorator(func: Callable) -> Callable:
+        cache = {}
+        last_clear = [time.time()]
+        
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            # Limpar cache se expirou
+            if time.time() - last_clear[0] > ttl:
+                cache.clear()
+                last_clear[0] = time.time()
+            
+            key = (args, tuple(sorted(kwargs.items())))
+            
+            if key not in cache:
+                cache[key] = func(*args, **kwargs)
+            
+            return cache[key]
+        
+        return wrapper
+    return decorator
+
+
+# ---
+
+"""
+helpers.py - Funções auxiliares
+"""
+
+import pandas as pd
+import numpy as np
+from typing import List, Dict, Union, Optional, Tuple
+
+
+def ensure_dataframe(data: Union[pd.DataFrame, Dict]) -> pd.DataFrame:
+    """Garantir que data é um DataFrame."""
+    if isinstance(data, pd.DataFrame):
+        return data
+    elif isinstance(data, Dict):
+        return pd.DataFrame([data])
+    else:
+        raise TypeError(f"Tipo não suportado: {type(data)}")
+
+
+def ensure_numpy(data: Union[np.ndarray, pd.DataFrame, pd.Series]) -> np.ndarray:
+    """Garantir que data é numpy array."""
+    if isinstance(data, np.ndarray):
+        return data
+    elif isinstance(data, (pd.DataFrame, pd.Series)):
+        return data.values
+    else:
+        return np.array(data)
+
+
+def get_memory_usage(obj: Any) -> str:
+    """Obter uso de memória de um objeto."""
+    if isinstance(obj, pd.DataFrame):
+        usage_mb = obj.memory_usage(deep=True).sum() / 1024 / 1024
+    elif isinstance(obj, pd.Series):
+        usage_mb = obj.memory_usage(deep=True) / 1024 / 1024
+    else:
+        usage_mb = 0
+    
+    return f"{usage_mb:.2f} MB"
+
+
+def flatten_dict(d: Dict, parent_key: str = "", sep: str = "_") -> Dict:
+    """Flatten nested dictionary."""
+    items = []
+    for k, v in d.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
+        else:
+            items.append((new_key, v))
+    return dict(items)
+
+
+def unflatten_dict(d: Dict, sep: str = "_") -> Dict:
+    """Unflatten dictionary."""
+    result = {}
+    for k, v in d.items():
+        parts = k.split(sep)
+        current = result
+        for part in parts[:-1]:
+            if part not in current:
+                current[part] = {}
+            current = current[part]
+        current[parts[-1]] = v
+    return result
+
+
+def chunk_list(lst: List, chunk_size: int) -> List[List]:
+    """Dividir lista em chunks."""
+    return [lst[i:i+chunk_size] for i in range(0, len(lst), chunk_size)]
+
+
+def progress_bar(
+    current: int,
+    total: int,
+    bar_length: int = 50
+) -> str:
+    """Gerar barra de progresso."""
+    percent = current / total
+    filled = int(bar_length * percent)
+    bar = "█" * filled + "░" * (bar_length - filled)
+    return f"|{bar}| {percent*100:.1f}%"
+
+
+def safe_divide(
+    numerator: np.ndarray,
+    denominator: np.ndarray,
+    fill_value: float = 0.0
+) -> np.ndarray:
+    """Divisão segura (evita divisão por zero)."""
+    return np.divide(
+        numerator,
+        denominator,
+        where=denominator != 0,
+        out=np.full_like(numerator, fill_value, dtype=float)
+    )
+
+
+def normalize_range(
+    arr: np.ndarray,
+    min_val: float = 0.0,
+    max_val: float = 1.0
+) -> np.ndarray:
+    """Normalizar array para range."""
+    arr_min = arr.min()
+    arr_max = arr.max()
+    
+    if arr_max == arr_min:
+        return np.full_like(arr, (min_val + max_val) / 2, dtype=float)
+    
+    normalized = (arr - arr_min) / (arr_max - arr_min)
+    return normalized * (max_val - min_val) + min_val
+
+
+def calculate_percentile_rank(
+    value: float,
+    distribution: np.ndarray
+) -> float:
+    """Calcular rank percentil de um valor."""
+    return (np.sum(distribution <= value) / len(distribution)) * 100
+
+
+def get_statistical_summary(series: pd.Series) -> Dict[str, float]:
+    """Obter sumário estatístico."""
+    return {
+        "count": series.count(),
+        "mean": series.mean(),
+        "median": series.median(),
+        "std": series.std(),
+        "min": series.min(),
+        "25%": series.quantile(0.25),
+        "75%": series.quantile(0.75),
+        "max": series.max(),
+        "skew": series.skew(),
+        "kurtosis": series.kurtosis()
+    }
+
+
+def detect_outliers(
+    series: pd.Series,
+    method: str = "iqr",
+    threshold: float = 1.5
+) -> np.ndarray:
+    """Detectar outliers."""
+    if method == "iqr":
+        Q1 = series.quantile(0.25)
+        Q3 = series.quantile(0.75)
+        IQR = Q3 - Q1
+        lower = Q1 - threshold * IQR
+        upper = Q3 + threshold * IQR
+        return (series < lower) | (series > upper)
+    
+    elif method == "zscore":
+        z_scores = np.abs((series - series.mean()) / series.std())
+        return z_scores > threshold
+    
+    elif method == "mad":  # Median Absolute Deviation
+        median = series.median()
+        mad = np.median(np.abs(series - median))
+        return np.abs(series - median) > threshold * mad
+    
+    else:
+        raise ValueError(f"Método desconhecido: {method}")
+
+
+def interpolate_missing(
+    series: pd.Series,
+    method: str = "linear"
+) -> pd.Series:
+    """Interpolar valores faltantes."""
+    if method == "linear":
+        return series.interpolate(method="linear")
+    elif method == "forward_fill":
+        return series.fillna(method="ffill")
+    elif method == "backward_fill":
+        return series.fillna(method="bfill")
+    else:
+        raise ValueError(f"Método desconhecido: {method}")
+
+
+def compare_distributions(
+    dist1: np.ndarray,
+    dist2: np.ndarray
+) -> Dict[str, float]:
+    """Comparar duas distribuições."""
+    from scipy import stats
+    
+    # Kolmogorov-Smirnov test
+    ks_stat, ks_pval = stats.ks_2samp(dist1, dist2)
+    
+    # Mann-Whitney U test
+    mw_stat, mw_pval = stats.mannwhitneyu(dist1, dist2)
+    
+    return {
+        "ks_statistic": ks_stat,
+        "ks_pvalue": ks_pval,
+        "mw_statistic": mw_stat,
+        "mw_pvalue": mw_pval
+    }

@@ -1,0 +1,288 @@
+"""
+db.py - Gerenciamento de conexão com banco de dados
+"""
+
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.pool import NullPool, QueuePool
+from typing import Generator, Optional
+import logging
+from contextlib import contextmanager
+
+logger = logging.getLogger(__name__)
+
+
+class DatabaseManager:
+    """Gerenciador de banco de dados."""
+    
+    def __init__(self, connection_string: str, pool_size: int = 20, max_overflow: int = 40):
+        """
+        Inicializar.
+        
+        Args:
+            connection_string: URL de conexão SQLAlchemy
+            pool_size: Tamanho do pool de conexões
+            max_overflow: Máximo de conexões extras
+        """
+        self.connection_string = connection_string
+        self.engine = None
+        self.SessionLocal = None
+        
+        self._create_engine(pool_size, max_overflow)
+    
+    def _create_engine(self, pool_size: int, max_overflow: int):
+        """Criar engine SQLAlchemy."""
+        try:
+            self.engine = create_engine(
+                self.connection_string,
+                poolclass=QueuePool,
+                pool_size=pool_size,
+                max_overflow=max_overflow,
+                echo=False,
+                connect_args={'timeout': 30} if 'sqlite' in self.connection_string else {}
+            )
+            
+            # Testar conexão
+            with self.engine.connect() as conn:
+                conn.execute("SELECT 1")
+            
+            self.SessionLocal = sessionmaker(bind=self.engine)
+            logger.info("✓ Engine de banco de dados criado com sucesso")
+            
+        except Exception as e:
+            logger.error(f"Erro ao criar engine: {e}")
+            raise
+    
+    @contextmanager
+    def get_session(self) -> Generator[Session, None, None]:
+        """
+        Context manager para sessão.
+        
+        Yields:
+            Session
+        """
+        session = self.SessionLocal()
+        try:
+            yield session
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Erro na sessão: {e}")
+            raise
+        finally:
+            session.close()
+    
+    def get_session_sync(self) -> Session:
+        """Obter sessão sícrona."""
+        return self.SessionLocal()
+    
+    def close(self):
+        """Fechar conexão."""
+        if self.engine:
+            self.engine.dispose()
+            logger.info("✓ Conexão de banco de dados fechada")
+
+
+---
+
+"""
+schemas.py - Schemas SQLAlchemy (ORM)
+"""
+
+from sqlalchemy import Column, String, Integer, Float, Boolean, Date, DateTime, ForeignKey, JSON
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship
+from datetime import datetime
+import uuid
+
+Base = declarative_base()
+
+
+class Patient(Base):
+    """Modelo de paciente."""
+    __tablename__ = "patients"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    patient_id = Column(String, unique=True, nullable=False, index=True)
+    age = Column(Integer, nullable=False)
+    gender = Column(String(1), nullable=False)
+    bmi = Column(Float)
+    education_years = Column(Integer)
+    employment_status = Column(String)
+    ethnicity = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    genomic_data = relationship("GenomicData", backref="patient", cascade="all, delete-orphan")
+    neurobiological_data = relationship("NeurobiologicalData", backref="patient", cascade="all, delete-orphan")
+    psychosocial_data = relationship("PsychosocialData", backref="patient", cascade="all, delete-orphan")
+    treatment_outcomes = relationship("TreatmentOutcome", backref="patient", cascade="all, delete-orphan")
+    predictions = relationship("ModelPrediction", backref="patient", cascade="all, delete-orphan")
+
+
+class GenomicData(Base):
+    """Dados genômicos."""
+    __tablename__ = "genomic_data"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    patient_id = Column(String, ForeignKey("patients.id"), nullable=False, index=True)
+    
+    cyp2d6_genotype = Column(Integer)
+    cyp3a4_genotype = Column(Integer)
+    mthfr_genotype = Column(Integer)
+    bdnf_genotype = Column(Integer)
+    
+    metabolizer_status = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class NeurobiologicalData(Base):
+    """Biomarcadores neurobiológicos."""
+    __tablename__ = "neurobiological_data"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    patient_id = Column(String, ForeignKey("patients.id"), nullable=False, index=True)
+    
+    il6_pg_ml = Column(Float)
+    tnf_alpha_pg_ml = Column(Float)
+    crp_mg_l = Column(Float)
+    cortisol_morning_nmol_l = Column(Float)
+    cortisol_evening_nmol_l = Column(Float)
+    serotonin_ng_ml = Column(Float)
+    dopamine_pg_ml = Column(Float)
+    bdnf_ng_ml = Column(Float)
+    
+    collection_date = Column(Date)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class PsychosocialData(Base):
+    """Dados psicossociais."""
+    __tablename__ = "psychosocial_data"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    patient_id = Column(String, ForeignKey("patients.id"), nullable=False, index=True)
+    
+    phq9_score = Column(Integer)
+    gad7_score = Column(Integer)
+    ctq_total = Column(Integer)
+    ace_total = Column(Integer)
+    psqi_score = Column(Integer)
+    social_support_score = Column(Float)
+    
+    assessment_date = Column(Date)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class TreatmentOutcome(Base):
+    """Resultados de tratamento."""
+    __tablename__ = "treatment_outcomes"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    patient_id = Column(String, ForeignKey("patients.id"), nullable=False, index=True)
+    
+    baseline_phq9 = Column(Integer)
+    week_12_phq9 = Column(Integer)
+    is_responder = Column(Boolean)
+    response_status = Column(String)
+    
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class ModelPrediction(Base):
+    """Predições do modelo."""
+    __tablename__ = "model_predictions"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    patient_id = Column(String, ForeignKey("patients.id"), nullable=False, index=True)
+    
+    model_version = Column(String)
+    prediction_probability = Column(Float, nullable=False)
+    risk_category = Column(String)
+    confidence = Column(Float)
+    
+    explanation = Column(JSON)
+    prediction_date = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+---
+
+"""
+repositories.py - Padrão Repository para acesso a dados
+"""
+
+from typing import List, Optional
+from sqlalchemy.orm import Session
+from src.database.schemas import Patient, GenomicData, ModelPrediction
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class PatientRepository:
+    """Repository para pacientes."""
+    
+    def __init__(self, session: Session):
+        self.session = session
+    
+    def create(self, patient_data: dict) -> Patient:
+        """Criar novo paciente."""
+        patient = Patient(**patient_data)
+        self.session.add(patient)
+        self.session.commit()
+        logger.info(f"Paciente criado: {patient.patient_id}")
+        return patient
+    
+    def get_by_id(self, patient_id: str) -> Optional[Patient]:
+        """Obter paciente por ID."""
+        return self.session.query(Patient).filter(Patient.patient_id == patient_id).first()
+    
+    def get_all(self, limit: int = 100) -> List[Patient]:
+        """Obter todos os pacientes."""
+        return self.session.query(Patient).limit(limit).all()
+    
+    def update(self, patient_id: str, data: dict) -> Optional[Patient]:
+        """Atualizar paciente."""
+        patient = self.get_by_id(patient_id)
+        if patient:
+            for key, value in data.items():
+                setattr(patient, key, value)
+            self.session.commit()
+        return patient
+    
+    def delete(self, patient_id: str) -> bool:
+        """Deletar paciente."""
+        patient = self.get_by_id(patient_id)
+        if patient:
+            self.session.delete(patient)
+            self.session.commit()
+            return True
+        return False
+
+
+class PredictionRepository:
+    """Repository para predições."""
+    
+    def __init__(self, session: Session):
+        self.session = session
+    
+    def save(self, prediction_data: dict) -> ModelPrediction:
+        """Salvar predição."""
+        prediction = ModelPrediction(**prediction_data)
+        self.session.add(prediction)
+        self.session.commit()
+        return prediction
+    
+    def get_latest_by_patient(self, patient_id: str) -> Optional[ModelPrediction]:
+        """Obter predição mais recente."""
+        return self.session.query(ModelPrediction)\
+            .filter(ModelPrediction.patient_id == patient_id)\
+            .order_by(ModelPrediction.prediction_date.desc())\
+            .first()
+    
+    def get_by_version(self, model_version: str) -> List[ModelPrediction]:
+        """Obter predições de uma versão."""
+        return self.session.query(ModelPrediction)\
+            .filter(ModelPrediction.model_version == model_version)\
+            .all()

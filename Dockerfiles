@@ -1,0 +1,474 @@
+"""
+tests/conftest.py - Fixtures compartilhadas para testes
+"""
+
+import pytest
+import numpy as np
+import pandas as pd
+from pathlib import Path
+import tempfile
+
+from src.data.generators import generate_and_save_dataset
+from src.ml_pipeline.pipeline import PrecisionPsychiatryPipeline
+
+
+@pytest.fixture(scope="session")
+def synthetic_dataset():
+    """Dataset sintético para testes (escopo: sessão)."""
+    dataset, _ = generate_and_save_dataset(n_patients=100)
+    return dataset
+
+
+@pytest.fixture(scope="function")
+def small_dataset():
+    """Dataset pequeno para testes unitários."""
+    dataset, _ = generate_and_save_dataset(n_patients=50)
+    return dataset
+
+
+@pytest.fixture
+def temp_dir():
+    """Diretório temporário para testes."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        yield Path(tmpdir)
+
+
+@pytest.fixture
+def trained_model(synthetic_dataset):
+    """Modelo treinado para testes."""
+    from src.ml_pipeline.pipeline import run_full_pipeline
+    
+    y = synthetic_dataset["responder"].astype(int)
+    drop_cols = ["responder", "response_status", "refractory",
+                "response_probability", "patient_id", "created_at",
+                "cohort", "phq9_baseline", "phq9_week12"]
+    X = synthetic_dataset.drop(columns=[col for col in drop_cols if col in synthetic_dataset.columns])
+    
+    pipeline, _ = run_full_pipeline(X.iloc[:80], y.iloc[:80], test_size=0.2)
+    return pipeline
+
+
+@pytest.fixture
+def sample_patient_data():
+    """Dados de amostra de paciente."""
+    return {
+        "patient_id": "PAT_TEST_001",
+        "genomic_data": {
+            "metabolizer_status": "extensive",
+            "cyp2d6_genotype": 2,
+            "cyp3a4_genotype": 1,
+            "mthfr_genotype": 0,
+            "bdnf_genotype": 1
+        },
+        "neurobiological_data": {
+            "il6_pg_ml": 2.5,
+            "tnf_alpha_pg_ml": 3.2,
+            "cortisol_morning_nmol_l": 320,
+            "cortisol_evening_nmol_l": 150,
+            "serotonin_ng_ml": 55.0,
+            "dopamine_pg_ml": 28.0,
+            "bdnf_ng_ml": 75.0,
+            "crp_mg_l": 2.1
+        },
+        "psychosocial_data": {
+            "age": 45,
+            "gender": "F",
+            "bmi": 24.5,
+            "education_years": 16,
+            "phq9_score": 18,
+            "gad7_score": 14,
+            "ctq_total": 45,
+            "ace_total": 2,
+            "social_support_score": 28,
+            "employment_status": "employed"
+        }
+    }
+
+
+---
+
+"""
+Dockerfile.api - Container para API FastAPI
+"""
+
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Instalar dependências do sistema
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copiar requirements
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copiar código
+COPY . .
+
+# Expor porta
+EXPOSE 8000
+
+# Comando
+CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+---
+
+"""
+Dockerfile.ml - Container para jobs de ML
+"""
+
+FROM python:3.10-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+ENV PYTHONUNBUFFERED=1
+
+CMD ["python", "scripts/train.py"]
+
+---
+
+"""
+.github/workflows/ci-cd.yml - GitHub Actions CI/CD
+"""
+
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11']
+    
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Run tests
+      run: |
+        pytest tests/ -v --tb=short --cov=src --cov-report=xml
+    
+    - name: Upload coverage
+      uses: codecov/codecov-action@v2
+      with:
+        file: ./coverage.xml
+
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install black flake8 mypy
+    
+    - name: Lint with flake8
+      run: |
+        flake8 src tests --count --select=E9,F63,F7,F82 --show-source --statistics
+    
+    - name: Format check with black
+      run: |
+        black --check src tests
+
+  build:
+    needs: [test, lint]
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Build Docker images
+      run: |
+        docker build -f docker/Dockerfile.api -t precision-psychiatry:api .
+        docker build -f docker/Dockerfile.ml -t precision-psychiatry:ml .
+
+---
+
+"""
+.gitignore - Arquivos a ignorar
+"""
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Data
+data/raw/
+data/processed/
+*.csv
+*.parquet
+
+# Models
+models/
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+---
+
+"""
+tests/__init__.py
+"""
+
+# Package initialization for tests
+
+---
+
+"""
+tests/unit/__init__.py
+"""
+
+# Unit tests package
+
+---
+
+"""
+tests/integration/__init__.py
+"""
+
+# Integration tests package
+
+---
+
+"""
+tests/fixtures/__init__.py
+"""
+
+# Fixtures package
+
+---
+
+"""
+Makefile - Automação de tasks
+"""
+
+.PHONY: install test lint format clean run-api train help
+
+install:
+	pip install -r requirements.txt
+
+test:
+	pytest tests/ -v --cov=src
+
+lint:
+	flake8 src tests
+	black --check src tests
+	mypy src
+
+format:
+	black src tests
+	isort src tests
+
+clean:
+	find . -type f -name '*.pyc' -delete
+	find . -type d -name '__pycache__' -delete
+	rm -rf build dist *.egg-info
+	rm -rf .pytest_cache .coverage htmlcov
+
+run-api:
+	python -m uvicorn src.api.main:app --reload
+
+run-api-prod:
+	python -m uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+
+train:
+	python scripts/train.py --n-samples 500
+
+docker-up:
+	docker-compose up -d
+
+docker-down:
+	docker-compose down
+
+docker-logs:
+	docker-compose logs -f api
+
+help:
+	@echo "Available targets:"
+	@echo "  make install       - Install dependencies"
+	@echo "  make test         - Run tests"
+	@echo "  make lint         - Lint code"
+	@echo "  make format       - Format code"
+	@echo "  make clean        - Clean temporary files"
+	@echo "  make run-api      - Run API (development)"
+	@echo "  make train        - Train model"
+	@echo "  make docker-up    - Start Docker stack"
+
+---
+
+"""
+scripts/generate_synthetic_data.py - Executável para gerar dados
+"""
+
+#!/usr/bin/env python3
+
+import argparse
+from pathlib import Path
+
+from src.data.generators import generate_and_save_dataset
+
+def main():
+    parser = argparse.ArgumentParser(description="Gerar dados sintéticos")
+    parser.add_argument("--n-patients", type=int, default=500)
+    parser.add_argument("--output-dir", type=str, default="data/synthetic")
+    
+    args = parser.parse_args()
+    
+    generate_and_save_dataset(
+        output_dir=Path(args.output_dir),
+        n_patients=args.n_patients
+    )
+
+if __name__ == "__main__":
+    main()
+
+---
+
+"""
+notebooks/00_project_overview.ipynb - Notebook de visão geral (em JSON)
+"""
+
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "# Precision Psychiatry - Project Overview\n",
+        "\n",
+        "Este notebook fornece uma visão geral do projeto."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "import sys\n",
+        "from pathlib import Path\n",
+        "sys.path.insert(0, str(Path.cwd()))\n",
+        "\n",
+        "from src.config import get_config\n",
+        "from src.data.generators import generate_and_save_dataset\n",
+        "\n",
+        "config = get_config()\n",
+        "print(f\"Environment: {config.environment}\")\n",
+        "print(f\"Project root: {config.project_root}\")"
+      ]
+    }
+  ],
+  "metadata": {
+    "kernelspec": {
+      "display_name": "Python 3",
+      "language": "python",
+      "name": "python3"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 4
+}
+
+---
+
+"""
+CONTRIBUTING.md - Guia de Contribuição
+"""
+
+# Guia de Contribuição
+
+## Primeiros Passos
+
+1. Fork o repositório
+2. Clone seu fork: `git clone https://github.com/nathadriele/precision-psychiatry.git`
+3. Crie uma branch: `git checkout -b feature/sua-feature`
+
+## Desenvolvimento
+
+1. Instale dependências: `make install`
+2. Execute testes: `make test`
+3. Faça linting: `make lint`
+
+## Submeter Pull Request
+
+1. Commit suas mudanças: `git commit -am 'Adiciona nova feature'`
+2. Push para branch: `git push origin feature/sua-feature`
+3. Abra um Pull Request
