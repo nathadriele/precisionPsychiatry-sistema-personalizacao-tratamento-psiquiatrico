@@ -17,15 +17,6 @@ class NeurobiologicalFeatureExtractor:
         self.verbose = verbose
     
     def extract_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Extrair features neurobiológicas.
-        
-        Args:
-            df: DataFrame com biomarcadores
-        
-        Returns:
-            DataFrame com features derivadas
-        """
         self.log("Extraindo features neurobiológicas...")
         
         features = pd.DataFrame(index=df.index)
@@ -232,15 +223,6 @@ class BiomarkerInterpreter:
     def interpret_biomarker_profile(
         biomarkers: Dict[str, float]
     ) -> Dict[str, str]:
-        """
-        Interpretar perfil completo de biomarcadores.
-        
-        Args:
-            biomarkers: Dicionário de biomarcadores
-        
-        Returns:
-            Interpretações
-        """
         interpretations = {}
         
         # Inflamação
@@ -281,15 +263,6 @@ class BiomarkerInterpreter:
     def get_treatment_implications(
         biomarkers: Dict[str, float]
     ) -> List[str]:
-        """
-        Obter implicações para tratamento.
-        
-        Args:
-            biomarkers: Dicionário de biomarcadores
-        
-        Returns:
-            Lista de implicações
-        """
         implications = []
         
         # Inflamação elevada
@@ -317,14 +290,5 @@ class BiomarkerInterpreter:
 
 
 def extract_neurobiological_features(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Extrair features neurobiológicas do DataFrame.
-    
-    Args:
-        df: DataFrame com biomarcadores
-    
-    Returns:
-        DataFrame com features neurobiológicas
-    """
     extractor = NeurobiologicalFeatureExtractor()
     return extractor.extract_features(df)
