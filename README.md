@@ -1,4 +1,5 @@
-# Precision Psychiatry - Sistema de Personalização de Tratamento Psiquiatrico
+# Precision Psychiatry
+## Sistema de Personalização de Tratamento Psiquiatrico
 
 **Precision Psychiatry** é um sistema protótipo de pesquisa de teste de IA/ML que integra dados genéticos, neurobiológicos e psicossociais para:
 
