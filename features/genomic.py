@@ -96,7 +96,6 @@ class GenomicFeatureExtractor:
             col_name = f"{gene}_genotype"
             if col_name in df.columns:
                 weight = self.gene_importance[gene]
-                # Genótipo 2 (homozigoto alt) = melhor metabolismo
                 score += weight * (df[col_name] / 2.0)
         
         # Normalizar entre 0 e 1
