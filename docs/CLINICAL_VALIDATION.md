@@ -124,9 +124,6 @@ from sklearn.metrics import precision_recall_curve, auc
 
 precision, recall, _ = precision_recall_curve(y_true, y_pred_proba)
 auc_pr = auc(recall, precision)
-
-# Importante quando classes são desbalanceadas
-# (mais sensível que ROC em dados desbalanceados)
 ```
 
 ## 4. Validação de Equidade (Fairness)
@@ -268,7 +265,7 @@ def validate_external_cohort(dev_model, ext_cohort):
     else:
         print(f"✓ Generalização validada (queda: {auc_drop:.2%})")
     
-    return ext_auc > 0.70  # Threshold mínimo
+    return ext_auc > 0.70
 ```
 
 ## 6. Análise de Adversidade e Riscos
@@ -499,29 +496,3 @@ Etnicidade:
 3. **Generalizabilidade**: Pode não generalizar para populações muito diferentes
 4. **Comorbidades**: Não otimizado para pacientes com comorbidades complexas
 5. **Medicamentos Novos**: Pode não incluir medicamentos muito recentes
-
-## 11. Recomendações Clínicas de Uso
-
-```
-✓ USE CASE APROPRIADO:
-  - Auxílio diagnóstico em depressão refratária
-  - Triagem inicial de respondedores vs. não-respondedores
-  - Suporte à tomada de decisão (não determinante)
-  - Pesquisa e desenvolvimento de tratamentos
-
-✗ NÃO USE:
-  - Como diagnóstico único (sempre com clínico)
-  - Em populações não representadas no treinamento
-  - Para alterar tratamento estabelecido sem seguimento
-  - Sem compreensão de limitações técnicas
-```
-
-## Conclusão
-
-Este sistema demonstra desempenho clínico aceitável com validação robusta em múltiplos domínios. Recomenda-se uso como ferramenta de suporte clínico, sempre sob supervisão de psiquiatras qualificados.
-
----
-
-**Versão:** 1.0.1
-**Data da Validação:** 12/2025  
-**Responsável:** Clinical Validation Board
