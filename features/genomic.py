@@ -111,7 +111,6 @@ class GenomicFeatureExtractor:
             col_name = f"{gene}_genotype"
             if col_name in df.columns:
                 weight = self.gene_importance[gene]
-                # Genótipo 2 = alelo favorável para serotonina
                 score += weight * (df[col_name] / 2.0)
         
         return score / sum([self.gene_importance[g] for g in serotonin_genes])
