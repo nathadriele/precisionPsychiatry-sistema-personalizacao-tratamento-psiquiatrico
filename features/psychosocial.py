@@ -19,15 +19,6 @@ class PsychosocialFeatureExtractor:
         self.verbose = verbose
     
     def extract_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Extrair features psicossociais.
-        
-        Args:
-            df: DataFrame com dados psicossociais
-        
-        Returns:
-            DataFrame com features derivadas
-        """
         self.log("Extraindo features psicossociais...")
         
         features = pd.DataFrame(index=df.index)
@@ -332,15 +323,6 @@ class ClinicalSeverityAssessor:
     
     @staticmethod
     def get_overall_severity(data: Dict) -> str:
-        """
-        Obter severidade clínica geral.
-        
-        Args:
-            data: Dicionário com dados psicossociais
-        
-        Returns:
-            Categoria de severidade
-        """
         phq9 = data.get("phq9_score", 0)
         gad7 = data.get("gad7_score", 0)
         
@@ -359,15 +341,6 @@ class ClinicalSeverityAssessor:
     
     @staticmethod
     def get_risk_level(data: Dict) -> str:
-        """
-        Obter nível de risco de não-resposta.
-        
-        Args:
-            data: Dicionário com dados psicossociais
-        
-        Returns:
-            Nível de risco
-        """
         risk_score = 0
         
         # Trauma
@@ -399,14 +372,5 @@ class ClinicalSeverityAssessor:
 
 
 def extract_psychosocial_features(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Extrair features psicossociais do DataFrame.
-    
-    Args:
-        df: DataFrame com dados psicossociais
-    
-    Returns:
-        DataFrame com features psicossociais
-    """
     extractor = PsychosocialFeatureExtractor()
     return extractor.extract_features(df)
