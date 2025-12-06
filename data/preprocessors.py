@@ -13,29 +13,23 @@ from abc import ABC, abstractmethod
 logger = logging.getLogger(__name__)
 
 
-class BasePreprocessor(ABC):
-    """Classe base para pré-processadores."""
-    
+class BasePreprocessor(ABC):    
     def __init__(self, verbose: bool = True):
         self.verbose = verbose
         self.fitted = False
     
     @abstractmethod
     def fit(self, X: np.ndarray) -> 'BasePreprocessor':
-        """Ajustar pré-processador."""
         pass
     
     @abstractmethod
     def transform(self, X: np.ndarray) -> np.ndarray:
-        """Transformar dados."""
         pass
     
     def fit_transform(self, X: np.ndarray) -> np.ndarray:
-        """Ajustar e transformar."""
         return self.fit(X).transform(X)
     
     def log(self, message: str):
-        """Log condicional."""
         if self.verbose:
             logger.info(message)
 
@@ -49,21 +43,12 @@ class MissingValueHandler(BasePreprocessor):
         threshold: float = 0.5,
         verbose: bool = True
     ):
-        """
-        Inicializar handler.
-        
-        Args:
-            strategy: 'mean', 'median', 'mode', 'drop', 'forward_fill'
-            threshold: Proporção máxima de missing (acima disso, drop coluna)
-            verbose: Verbosidade
-        """
         super().__init__(verbose)
         self.strategy = strategy
         self.threshold = threshold
         self.fill_values = {}
     
     def fit(self, X: pd.DataFrame) -> 'MissingValueHandler':
-        """Ajustar handler."""
         self.log("Analisando valores faltantes...")
         
         # Remover colunas com muitos missing values
@@ -86,7 +71,6 @@ class MissingValueHandler(BasePreprocessor):
         return self
     
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
-        """Transformar dados."""
         if not self.fitted:
             raise ValueError("Preprocessor não foi ajustado. Chame fit() primeiro.")
         
@@ -111,21 +95,12 @@ class OutlierRemover(BasePreprocessor):
         threshold: float = 3.0,
         verbose: bool = True
     ):
-        """
-        Inicializar remover.
-        
-        Args:
-            method: 'iqr' (Interquartile Range) ou 'zscore'
-            threshold: Multiplicador para IQR ou Z-score threshold
-            verbose: Verbosidade
-        """
         super().__init__(verbose)
         self.method = method
         self.threshold = threshold
         self.bounds = {}
     
     def fit(self, X: pd.DataFrame) -> 'OutlierRemover':
-        """Ajustar remover."""
         self.log(f"Calculando bounds de outliers usando {self.method}...")
         
         if self.method == "iqr":
@@ -149,7 +124,6 @@ class OutlierRemover(BasePreprocessor):
         return self
     
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
-        """Transformar dados."""
         if not self.fitted:
             raise ValueError("Preprocessor não foi ajustado.")
         
@@ -178,19 +152,11 @@ class NormalizeScaler(BasePreprocessor):
         method: str = "standard",
         verbose: bool = True
     ):
-        """
-        Inicializar scaler.
-        
-        Args:
-            method: 'standard', 'robust', 'minmax'
-            verbose: Verbosidade
-        """
         super().__init__(verbose)
         self.method = method
         self.scaler = None
     
     def fit(self, X: pd.DataFrame) -> 'NormalizeScaler':
-        """Ajustar scaler."""
         self.log(f"Ajustando scaler {self.method}...")
         
         if self.method == "standard":
@@ -207,7 +173,6 @@ class NormalizeScaler(BasePreprocessor):
         return self
     
     def transform(self, X: pd.DataFrame) -> np.ndarray:
-        """Transformar dados."""
         if not self.fitted:
             raise ValueError("Scaler não foi ajustado.")
         
@@ -215,7 +180,6 @@ class NormalizeScaler(BasePreprocessor):
 
 
 class FeatureSelector(BasePreprocessor):
-    """Seleção de features."""
     
     def __init__(
         self,
@@ -223,14 +187,6 @@ class FeatureSelector(BasePreprocessor):
         threshold: float = 0.01,
         verbose: bool = True
     ):
-        """
-        Inicializar seletor.
-        
-        Args:
-            method: 'variance', 'correlation'
-            threshold: Threshold de variância
-            verbose: Verbosidade
-        """
         super().__init__(verbose)
         self.method = method
         self.threshold = threshold
@@ -256,7 +212,6 @@ class FeatureSelector(BasePreprocessor):
         return self
     
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
-        """Transformar dados."""
         if not self.fitted:
             raise ValueError("Seletor não foi ajustado.")
         
@@ -273,15 +228,6 @@ class DimensionalityReducer(BasePreprocessor):
         variance_ratio: float = 0.95,
         verbose: bool = True
     ):
-        """
-        Inicializar redutor.
-        
-        Args:
-            method: 'pca'
-            n_components: Número de componentes
-            variance_ratio: Ratio de variância a explicar
-            verbose: Verbosidade
-        """
         super().__init__(verbose)
         self.method = method
         self.n_components = n_components
@@ -289,11 +235,9 @@ class DimensionalityReducer(BasePreprocessor):
         self.reducer = None
     
     def fit(self, X: np.ndarray) -> 'DimensionalityReducer':
-        """Ajustar redutor."""
         self.log(f"Ajustando {self.method}...")
         
         if self.method == "pca":
-            # Se n_components não especificado, calcular para variance_ratio
             if self.n_components is None:
                 self.reducer = PCA()
                 self.reducer.fit(X)
@@ -308,7 +252,6 @@ class DimensionalityReducer(BasePreprocessor):
         return self
     
     def transform(self, X: np.ndarray) -> np.ndarray:
-        """Transformar dados."""
         if not self.fitted:
             raise ValueError("Redutor não foi ajustado.")
         
@@ -324,12 +267,10 @@ class PreprocessingPipeline:
         self.fitted = False
     
     def add_step(self, name: str, preprocessor: BasePreprocessor) -> 'PreprocessingPipeline':
-        """Adicionar step ao pipeline."""
         self.steps.append((name, preprocessor))
         return self
     
     def fit(self, X: pd.DataFrame) -> 'PreprocessingPipeline':
-        """Ajustar pipeline."""
         self.log("Ajustando pipeline...")
         
         for name, preprocessor in self.steps:
@@ -343,7 +284,6 @@ class PreprocessingPipeline:
         return self
     
     def transform(self, X: pd.DataFrame) -> Union[pd.DataFrame, np.ndarray]:
-        """Transformar dados."""
         if not self.fitted:
             raise ValueError("Pipeline não foi ajustado.")
         
@@ -355,22 +295,14 @@ class PreprocessingPipeline:
         return X
     
     def fit_transform(self, X: pd.DataFrame) -> Union[pd.DataFrame, np.ndarray]:
-        """Ajustar e transformar."""
         return self.fit(X).transform(X)
     
     def log(self, message: str):
-        """Log condicional."""
         if self.verbose:
             logger.info(message)
 
 
 def build_default_pipeline() -> PreprocessingPipeline:
-    """
-    Construir pipeline padrão de pré-processamento.
-    
-    Returns:
-        PreprocessingPipeline
-    """
     pipeline = PreprocessingPipeline()
     
     pipeline.add_step("missing_values", MissingValueHandler(strategy="mean"))
@@ -385,17 +317,6 @@ def preprocess_data(
     pipeline: Optional[PreprocessingPipeline] = None,
     fit: bool = True
 ) -> Union[pd.DataFrame, np.ndarray]:
-    """
-    Pré-processar dados com pipeline.
-    
-    Args:
-        X: DataFrame
-        pipeline: PreprocessingPipeline (se None, usa padrão)
-        fit: Se True, ajusta pipeline
-    
-    Returns:
-        Dados pré-processados
-    """
     if pipeline is None:
         pipeline = build_default_pipeline()
     
