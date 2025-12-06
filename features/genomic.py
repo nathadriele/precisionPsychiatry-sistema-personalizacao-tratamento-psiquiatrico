@@ -132,7 +132,6 @@ class GenomicFeatureExtractor:
         for gene in CORE_GENES:
             col_name = f"{gene}_genotype"
             if col_name in df.columns:
-                # Genótipo 0 = risco maior (homozigoto ref)
                 count += (2 - df[col_name])
         
         return count
@@ -151,11 +150,9 @@ class GenomicFeatureExtractor:
         return n_hetero / n_genes if n_genes > 0 else pd.Series(0, index=df.index)
     
     def get_feature_importance(self) -> Dict[str, float]:
-        """Obter importância de features."""
         return self.gene_importance.copy()
     
     def log(self, message: str):
-        """Log."""
         if self.verbose:
             logger.info(message)
 
@@ -165,15 +162,6 @@ class GenomicInterpreter:
     
     @staticmethod
     def interpret_cyp2d6_activity(genotype: int) -> Tuple[str, str]:
-        """
-        Interpretar atividade CYP2D6.
-        
-        Args:
-            genotype: Genótipo (0, 1, 2)
-        
-        Returns:
-            Tupla (activity_level, interpretation)
-        """
         interpretations = {
             0: ("low", "Homozigoto para alelo de baixa atividade"),
             1: ("intermediate", "Heterozigoto"),
@@ -186,16 +174,6 @@ class GenomicInterpreter:
         genotypes: Dict[str, int],
         metabolizer_status: str
     ) -> Dict[str, List[str]]:
-        """
-        Obter recomendações de medicamentos baseado em genótipo.
-        
-        Args:
-            genotypes: Dicionário de genótipos
-            metabolizer_status: Status de metabolizador
-        
-        Returns:
-            Dicionário com recomendações
-        """
         recommendations = {
             "recommended": [],
             "caution": [],
@@ -225,15 +203,6 @@ class GenomicInterpreter:
     
     @staticmethod
     def get_contraindications(genotypes: Dict[str, int]) -> List[str]:
-        """
-        Obter contra-indicações baseado em genótipo.
-        
-        Args:
-            genotypes: Dicionário de genótipos
-        
-        Returns:
-            Lista de contra-indicações
-        """
         contraindications = []
         
         # CYP2D6 homozigoto mutante pode causar toxicidade
@@ -255,21 +224,11 @@ class GenomicInterpreter:
     def calculate_genomic_risk_score(
         genotypes: Dict[str, int]
     ) -> float:
-        """
-        Calcular score genômico de risco.
-        
-        Args:
-            genotypes: Dicionário de genótipos
-        
-        Returns:
-            Score entre 0 e 1 (0=baixo risco, 1=alto risco)
-        """
         risk_score = 0.0
         n_genes = 0
         
         for gene, genotype in genotypes.items():
             if "_genotype" in gene:
-                # Genótipo 0 = alelo de risco
                 risk_score += (2 - genotype) / 2.0
                 n_genes += 1
         
@@ -280,14 +239,5 @@ class GenomicInterpreter:
 
 
 def extract_genomic_features(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Extrair features genômicas do DataFrame.
-    
-    Args:
-        df: DataFrame com dados genômicos
-    
-    Returns:
-        DataFrame com features genômicas
-    """
     extractor = GenomicFeatureExtractor()
     return extractor.extract_features(df)
