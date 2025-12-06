@@ -1,142 +1,93 @@
 # Precision Psychiatry
-## Sistema de Personalização de Tratamento Psiquiatrico
+## Personalized Psychiatric Treatment System
 
-**Precision Psychiatry** é um sistema protótipo de pesquisa de teste de IA/ML que integra dados genéticos, neurobiológicos e psicossociais para:
+<img width="1424" height="652" alt="image" src="https://github.com/user-attachments/assets/1166e45e-b894-4e35-aa9e-ab6b8f4187c7" />
 
-- **Predição de Resposta Terapêutica**: Prever resposta a medicamentos antidepressivos
-- **Análise Genômica**: Integração de dados de polimorfismos genéticos relevantes
-- **Marcadores Neurobiológicos**: Processamento de dados de neuroimagem, EEG, biomarcadores
-- **Fatores Psicossociais**: Avaliação de estressores ambientais e dados demográficos
-- **Recomendação de Medicamentos**: Sugestões personalizadas para pacientes com depressão refratária
-- **Monitoramento Longitudinal**: Acompanhamento de resposta ao tratamento ao longo do tempo
+**Precision Psychiatry** is a prototype AI/ML research system that integrates genetic, neurobiological, and psychosocial data to:
+- Therapeutic Response Prediction: Predict response to antidepressant medications
+- Genomic Analysis: Integration of relevant genetic polymorphism data
+- Neurobiological Markers: Processing of neuroimaging, EEG, and biomarker data
+- Psychosocial Factors: Assessment of environmental stressors and demographic data
+- Medication Recommendation: Personalized suggestions for patients with treatment-resistant depression
+- Longitudinal Monitoring: Follow-up of treatment response over time
 
-## Stack Tecnológico
-
+## Technology Stack
 ### Data & ML
-- **Pandas, NumPy**: Processamento de dados
-- **Scikit-learn**: Modelos clássicos de ML
-- **XGBoost, LightGBM**: Gradient Boosting
-- **TensorFlow/Keras**: Deep Learning
-- **SHAP**: Explicabilidade de modelos
+- Pandas, NumPy: Data processing
+- Scikit-learn: Classical ML models
+- XGBoost, LightGBM: Gradient boosting
+- TensorFlow/Keras: Deep learning
+- SHAP: Model explainability
 
 ### Database
-- **PostgreSQL**: Dados estruturados
-- **Neo4j**: Grafo de relacionamentos genômicos
-- **Redis**: Cache e filas
-
+- PostgreSQL: Structured data
+- Redis: Caching and queues
+  
 ### API & Backend
-- **FastAPI**: API REST moderna
-- **Pydantic**: Validação de dados
-- **SQLAlchemy**: ORM
+- FastAPI: Modern REST API
+- Pydantic: Data validation
+- SQLAlchemy: ORM
 
 ### DevOps
-- **Docker/Docker-compose**: Containerização
-- **pytest**: Testes automatizados
-- **MLflow/Weights & Biases**: Rastreamento de experimentos
+- Docker/Docker-compose: Containerization
+- pytest: Automated tests
+- MLflow/Weights & Biases: Experiment tracking
 
-## Features Principais
+## Main Features
+1. Advanced Genomic Analysis
+- Processing of SNPs (Single Nucleotide Polymorphisms)
+- Analysis of relevant polymorphisms (CYP2D6, CYP3A4, MTHFR, BDNF)
+- Calculation of polygenic genetic risk
+- Functional annotation of variants
 
-### 1. **Análise Genômica Avançada**
-- Processamento de SNPs (Single Nucleotide Polymorphisms)
-- Análise de polimorfismos relevantes (CYP2D6, CYP3A4, MTHFR, BDNF)
-- Cálculo de risco genético poligênico
-- Anotação funcional de variantes
+2. Integration of Neurobiological Biomarkers
+- Cortisol, ACTH, cytokines (IL-6, TNF-α)
+- Neurotransmitters (serotonin, dopamine, noradrenaline)
+- Neuroimaging processing (fMRI, structural)
+- EEG metrics (spectral power, coherence)
 
-### 2. **Integração de Biomarcadores Neurobiológicos**
-- Cortisol, ACTH, citocinas (IL-6, TNF-α)
-- Neurotransmissores (serotonina, dopamina, noradrenalina)
-- Processamento de neuroimagem (fMRI, estrutural)
-- Métricas de EEG (potência espectral, coerência)
+3. Structured Psychosocial Assessment
+- Clinical scales (PHQ-9, GAD-7, PANSS)
+- Trauma history (CTQ, ACE)
+- Social support and environmental stressors
+- Psychiatric comorbidities
 
-### 3. **Avaliação Psicossocial Estruturada**
-- Escalas clínicas (PHQ-9, GAD-7, PANSS)
-- Histórico de trauma (CTQ, ACE)
-- Suporte social e estressores ambientais
-- Comorbidades psiquiátricas
+4. Hybrid Predictive Models
+- Ensemble of models (RF, XGBoost, SVM, neural networks)
+- Stratified cross-validation
+- Probability calibration
+- Uncertainty analysis
 
-### 4. **Modelos Preditivos Híbridos**
-- Ensemble de modelos (RF, XGBoost, SVM, redes neurais)
-- Validação cruzada estratificada
-- Calibração de probabilidades
-- Análise de incerteza
-
-### 5. **Explicabilidade e Interpretabilidade**
-- SHAP values para feature importance
-- LIME para explicações locais
+5. Explainability and Interpretability
+- SHAP values for feature importance
+- LIME for local explanations
 - Permutation importance
 - Partial dependence plots
 
-### 6. **Sistema de Recomendação**
-- Scores de eficácia por medicamento
-- Previsão de efeitos adversos
-- Dosagem personalizada
-- ContraIndicações baseadas em genótipo
+6. Recommendation System
+- Drug-specific efficacy scores
+- Adverse effect prediction
+- Personalized dosing
+- Genotype-based contraindications
 
-## Dados Sintéticos
+<img width="603" height="618" alt="image" src="https://github.com/user-attachments/assets/23c793b4-d89f-4b85-b43d-c3819f60a576" />
 
-O projeto inclui gerador de dados sintéticos realistas para:
-- 500+ pacientes
-- 50+ features genômicas
-- 20+ biomarcadores
-- Respostas terapêuticas baseadas em regras clínicas
-- Distribuições que refletem características reais
+### Model Training
 
-## Instalação Rápida
+<img width="964" height="64" alt="image" src="https://github.com/user-attachments/assets/d4cf1713-c6e5-4332-8e98-10ff98ec75ab" />
 
-```bash
-# Clone o repositório
-git clone https://github.com/mathadriele/precisionPsychiatry-sistema-personalizacao-tratamento-psiquiatrico.git
-cd precision-psychiatry
+### Inference for an Individual Patient
 
-# Crie ambiente virtual
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# ou: venv\Scripts\activate  # Windows
+<img width="1094" height="158" alt="image" src="https://github.com/user-attachments/assets/c495165d-2fa7-49c9-b082-2f010cc9d4a3" />
 
-# Instale dependências
-pip install -r requirements.txt
+### REST API
 
-# Configure variáveis de ambiente
-cp .env.example .env
+<img width="1081" height="155" alt="image" src="https://github.com/user-attachments/assets/069aa7a7-4f42-4ad6-ab4f-be2dd55d2197" />
 
-# Execute testes
-pytest tests/ -v
+### Clinical Validation
 
-# Inicie a API
-python -m uvicorn src.api.main:app --reload
-```
-
-## Uso
-
-### Treinamento de Modelo
-```bash
-python scripts/train.py --config config/default.yaml --output models/v1
-```
-
-### Inferência para Paciente Individual
-```bash
-python scripts/inference.py \
-  --model-path models/v1/model.pkl \
-  --patient-data data/sample_patient.json \
-  --output results/recommendation.json
-```
-
-### API REST
-```bash
-curl -X POST http://localhost:8000/api/v1/predict \
-  -H "Content-Type: application/json" \
-  -d @data/patient.json
-```
-
-## Validação Clínica
-
-O projeto implementa rigorosa validação clínica:
-- Métricas de performance (AUC, sensitivity, specificity)
-- Análise de concordância com diagnósticos clínicos
-- Validação em coortes independentes
-- Análise de bias por demografia
-- Conformidade com GDPR/HIPAA
-
-## Contato e Suporte
-
-Para dúvidas ou sugestões, abra uma issue no repositório ou entre em contato.
+- The project implements rigorous clinical validation:
+- Performance metrics (AUC, sensitivity, specificity)
+- Concordance analysis with clinical diagnoses
+- Validation in independent cohorts
+- Demographic bias analys
